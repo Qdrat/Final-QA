@@ -93,7 +93,6 @@ jobs:
             - name: Start backend and database
               run: |
                   cd ./app
-                  # Правильное имя сервиса БД: postgres_db
                   docker-compose up -d postgres_db api
 
             - name: Wait for database
@@ -113,6 +112,23 @@ jobs:
               run: |
                   cd ./app
                   docker-compose exec -T api pnpm --filter api seed
+
+            # ---- СОЗДАЁМ НЕДОСТАЮЩИЙ tsconfig.node.json ----
+            - name: Create missing tsconfig.node.json
+              run: |
+                  cd ./app/apps/web
+                  cat > tsconfig.node.json << 'EOF'
+                  {
+                    "compilerOptions": {
+                      "composite": true,
+                      "skipLibCheck": true,
+                      "module": "ESNext",
+                      "moduleResolution": "bundler",
+                      "allowSyntheticDefaultImports": true
+                    },
+                    "include": ["vite.config.ts"]
+                  }
+                  EOF
 
             # ---- Собираем фронтенд статически ----
             - name: Build frontend
