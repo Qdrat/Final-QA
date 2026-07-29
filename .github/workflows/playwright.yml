@@ -113,11 +113,27 @@ jobs:
                   cd ./app
                   docker-compose exec -T api pnpm --filter api seed
 
-            # ---- Собираем фронтенд без TypeScript-проверки (пропускаем tsc) ----
-            - name: Build frontend (skip tsc)
+            # ---- СОЗДАЁМ ОТСУТСТВУЮЩИЙ tsconfig.node.json ----
+            - name: Create missing tsconfig.node.json
               run: |
                   cd ./app/apps/web
-                  # Запускаем vite build напрямую, игнорируя tsc
+                  cat > tsconfig.node.json << 'EOF'
+                  {
+                    "compilerOptions": {
+                      "composite": true,
+                      "skipLibCheck": true,
+                      "module": "ESNext",
+                      "moduleResolution": "bundler",
+                      "allowSyntheticDefaultImports": true
+                    },
+                    "include": ["vite.config.ts"]
+                  }
+                  EOF
+
+            # ---- Собираем фронтенд статически (обход tsc) ----
+            - name: Build frontend
+              run: |
+                  cd ./app/apps/web
                   npx vite build
 
             # ---- Запускаем сервер для статики ----
