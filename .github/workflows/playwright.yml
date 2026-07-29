@@ -40,20 +40,19 @@ jobs:
             - name: Install Playwright Browsers
               run: npx playwright install --with-deps
 
-            # 1. Клонируем приложение (публичный репозиторий)
+            # ---- Клонируем приложение ----
             - name: Checkout application
               uses: actions/checkout@v4
               with:
                   repository: Gygamyt/site_4_interns
                   path: ./app
 
-            # 2. Устанавливаем pnpm (приложение использует pnpm)
+            # ---- Устанавливаем pnpm для приложения ----
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
               with:
                   version: 9
 
-            # 3. Настраиваем Node.js для приложения (с кешированием pnpm)
             - name: Setup Node for app
               uses: actions/setup-node@v4
               with:
@@ -61,13 +60,13 @@ jobs:
                   cache: 'pnpm'
                   cache-dependency-path: './app/pnpm-lock.yaml'
 
-            # 4. Устанавливаем docker-compose (т.к. на раннере его нет)
+            # ---- Устанавливаем docker-compose ----
             - name: Install docker-compose
               run: |
                   sudo apt-get update
                   sudo apt-get install -y docker-compose
 
-            # ---- Поэтапная установка вместо full-setup ----
+            # ---- Установка зависимостей и генерация .env ----
             - name: Install app dependencies
               run: |
                   cd ./app
@@ -78,16 +77,20 @@ jobs:
                   cd ./app
                   pnpm gen:envs
 
+            # ---- Переопределяем API URL для фронтенда (чтобы браузер обращался к localhost:3000) ----
             - name: Override API URL for web
               run: |
                   cd ./app
                   echo "VITE_API_URL=http://localhost:3000" >> apps/web/.env
-                  echo "VITE_API_BASE_URL=http://localhost:3000" >> apps/web/.env   # если используется другая переменная
+                  echo "VITE_API_BASE_URL=http://localhost:3000" >> apps/web/.env
+                  echo "VITE_API_BASE=http://localhost:3000" >> apps/web/.env
 
-            - name: Start containers
+            # ---- Запускаем только API и БД через docker-compose (без web-контейнера) ----
+            - name: Start backend and database
               run: |
                   cd ./app
-                  docker-compose up -d
+                  # Запускаем только нужные сервисы: postgres и api (без web)
+                  docker-compose up -d postgres api
 
             - name: Wait for database
               run: |
@@ -101,19 +104,33 @@ jobs:
                     sleep 2
                   done
 
-            # ---- Сидирование БЕЗ TTY (ключ -T) ----
+            # ---- Сидирование БД ----
             - name: Seed database
               run: |
                   cd ./app
                   docker-compose exec -T api pnpm --filter api seed
 
-            - name: Debug web response
+            # ---- Собираем фронтенд статически и запускаем через serve ----
+            - name: Build frontend
               run: |
-                  echo "=== Web HTML (first 100 lines) ==="
-                  curl -s http://localhost:5173 | head -100
-                  echo "=== Web container logs ==="
-                  docker logs shop_system_web_dev --tail 50
+                  cd ./app
+                  pnpm --filter web build
 
+            - name: Serve frontend
+              run: |
+                  cd ./app
+                  # Устанавливаем serve глобально или через npx
+                  npx serve -s apps/web/dist -l 5173 &
+                  # Ждём, пока сервер поднимется
+                  sleep 5
+
+            # ---- Отладка: проверяем, что фронтенд отдаёт HTML с приложением ----
+            - name: Debug frontend response
+              run: |
+                  echo "=== Frontend HTML (first 100 lines) ==="
+                  curl -s http://localhost:5173 | head -100
+
+            # ---- Ожидание готовности API и фронтенда ----
             - name: Wait for services (API & Frontend)
               run: |
                   echo "Waiting for API (port 3000)..."
