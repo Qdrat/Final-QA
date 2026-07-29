@@ -78,6 +78,12 @@ jobs:
                   cd ./app
                   pnpm gen:envs
 
+            - name: Override API URL for web
+              run: |
+                  cd ./app
+                  echo "VITE_API_URL=http://localhost:3000" >> apps/web/.env
+                  echo "VITE_API_BASE_URL=http://localhost:3000" >> apps/web/.env   # если используется другая переменная
+
             - name: Start containers
               run: |
                   cd ./app
@@ -100,6 +106,13 @@ jobs:
               run: |
                   cd ./app
                   docker-compose exec -T api pnpm --filter api seed
+
+            - name: Debug web response
+              run: |
+                  echo "=== Web HTML (first 100 lines) ==="
+                  curl -s http://localhost:5173 | head -100
+                  echo "=== Web container logs ==="
+                  docker logs shop_system_web_dev --tail 50
 
             - name: Wait for services (API & Frontend)
               run: |
