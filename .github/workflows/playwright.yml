@@ -67,27 +67,51 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y docker-compose
 
-            # 5. Запускаем полную установку приложения (сборка, БД, сидирование)
-            - name: Full setup of application
+            # ---- Поэтапная установка вместо full-setup ----
+            - name: Install app dependencies
               run: |
                   cd ./app
-                  pnpm full-setup
-              env:
-                  CI: true # отключаем интерактивные запросы
+                  pnpm install
 
-            # 6. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
-            - name: Wait for services to be ready
+            - name: Generate environment files
               run: |
-                  echo "Waiting for backend (port 3000)..."
+                  cd ./app
+                  pnpm gen:envs
+
+            - name: Start containers
+              run: |
+                  cd ./app
+                  docker-compose up -d
+
+            - name: Wait for database
+              run: |
+                  cd ./app
+                  echo "Waiting for Postgres..."
+                  for i in {1..30}; do
+                    if docker-compose exec -T postgres pg_isready -U postgres > /dev/null 2>&1; then
+                      echo "Postgres is ready!"
+                      break
+                    fi
+                    sleep 2
+                  done
+
+            # ---- Сидирование БЕЗ TTY (ключ -T) ----
+            - name: Seed database
+              run: |
+                  cd ./app
+                  docker-compose exec -T api pnpm --filter api seed
+
+            - name: Wait for services (API & Frontend)
+              run: |
+                  echo "Waiting for API (port 3000)..."
                   for i in {1..40}; do
                     if curl -s http://localhost:3000/api-docs > /dev/null; then
-                      echo "Backend is up!"
+                      echo "API is up!"
                       break
                     fi
                     sleep 3
                   done
-
-                  echo "Waiting for frontend (port 5173)..."
+                  echo "Waiting for Frontend (port 5173)..."
                   for i in {1..40}; do
                     if curl -s http://localhost:5173 > /dev/null; then
                       echo "Frontend is up!"
