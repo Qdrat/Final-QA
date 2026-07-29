@@ -4,8 +4,31 @@ on:
         branches: [main, master]
     pull_request:
         branches: [main, master]
+
+permissions:
+    contents: write
+    pages: write
+    id-token: write
+
 jobs:
+    lint-and-format:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
+                  cache: 'npm'
+            - run: npm ci
+            - name: Run ESLint
+              run: npm run lint
+            - name: Check Code Formatting (Prettier)
+              run: npm run format:check
+            - name: Run TypeScript Type Check (tsc)
+              run: npx tsc --noEmit
+
     test:
+        needs: lint-and-format
         timeout-minutes: 60
         runs-on: ubuntu-latest
         steps:
@@ -13,10 +36,62 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: lts/*
+                  cache: 'npm'
             - name: Install dependencies
               run: npm ci
             - name: Install Playwright Browsers
               run: npx playwright install --with-deps
+
+            # 1. Клонируем приложение (публичный репозиторий)
+            - name: Checkout application
+              uses: actions/checkout@v4
+              with:
+                  repository: Gygamyt/site_4_interns
+                  path: ./app
+
+            # 2. Устанавливаем pnpm (приложение использует pnpm)
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            # 3. Настраиваем Node.js для приложения (с кешированием pnpm)
+            - name: Setup Node for app
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'pnpm'
+                  cache-dependency-path: './app/pnpm-lock.yaml'
+
+            # 4. Запускаем полную установку приложения (сборка, БД, сидирование)
+            - name: Full setup of application
+              run: |
+                  cd ./app
+                  pnpm full-setup
+              env:
+                  CI: true # отключаем интерактивные запросы
+
+            # 5. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
+            - name: Wait for services to be ready
+              run: |
+                  echo "Waiting for backend (port 3000)..."
+                  for i in {1..40}; do
+                    if curl -s http://localhost:3000/api-docs > /dev/null; then
+                      echo "Backend is up!"
+                      break
+                    fi
+                    sleep 3
+                  done
+
+                  echo "Waiting for frontend (port 5173)..."
+                  for i in {1..40}; do
+                    if curl -s http://localhost:5173 > /dev/null; then
+                      echo "Frontend is up!"
+                      break
+                    fi
+                    sleep 3
+                  done
+
             - name: Run Playwright tests
               run: npx playwright test
               if: always()
