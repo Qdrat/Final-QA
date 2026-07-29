@@ -61,7 +61,13 @@ jobs:
                   cache: 'pnpm'
                   cache-dependency-path: './app/pnpm-lock.yaml'
 
-            # 4. Запускаем полную установку приложения (сборка, БД, сидирование)
+            # 4. Устанавливаем docker-compose (т.к. на раннере его нет)
+            - name: Install docker-compose
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y docker-compose
+
+            # 5. Запускаем полную установку приложения (сборка, БД, сидирование)
             - name: Full setup of application
               run: |
                   cd ./app
@@ -69,7 +75,7 @@ jobs:
               env:
                   CI: true # отключаем интерактивные запросы
 
-            # 5. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
+            # 6. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
             - name: Wait for services to be ready
               run: |
                   echo "Waiting for backend (port 3000)..."
