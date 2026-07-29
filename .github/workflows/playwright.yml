@@ -44,7 +44,7 @@ jobs:
             - name: Checkout application
               uses: actions/checkout@v4
               with:
-                  repository: Gygamyt/site_4_interns
+                  repository: Qdrat/site_4_interns-feature-intermediate_version
                   path: ./app
 
             # 2. Устанавливаем pnpm (приложение использует pnpm)
