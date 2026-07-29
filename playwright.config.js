@@ -60,8 +60,8 @@ export default defineConfig({
             use: { ...devices['Pixel 5'] },
         },
         {
-          name: 'Mobile Safari',
-          use: { ...devices['iPhone 12'] },
+            name: 'Mobile Safari',
+            use: { ...devices['iPhone 12'] },
         },
 
         /* Test against branded browsers. */
