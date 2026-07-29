@@ -1,158 +1,153 @@
 name: Playwright Tests
 
 on:
-  push:
-    branches: [main, master]
-  pull_request:
-    branches: [main, master]
+    push:
+        branches: [main, master]
+    pull_request:
+        branches: [main, master]
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+    contents: write
+    pages: write
+    id-token: write
 
 jobs:
-  # ----- Линтинг и форматирование (без TypeScript) -----
-  lint-and-format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: 'npm'
-      - run: npm ci
-      - name: Run ESLint
-        run: npm run lint
-      - name: Check Code Formatting (Prettier)
-        run: npm run format:check
+    lint-and-format:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
+                  cache: 'npm'
+            - run: npm ci
+            - name: Run ESLint
+              run: npm run lint
+            - name: Check Code Formatting (Prettier)
+              run: npm run format:check
 
-  # ----- Основные тесты -----
-  test:
-    needs: lint-and-format
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    test:
+        needs: lint-and-format
+        timeout-minutes: 60
+        runs-on: ubuntu-latest
+        steps:
+            # 1. Клонируем репозиторий с тестами
+            - uses: actions/checkout@v4
 
-    steps:
-      # 1. Клонируем репозиторий с тестами
-      - uses: actions/checkout@v4
+            # 2. Клонируем репозиторий с приложением (публичный)
+            - name: Checkout app
+              uses: actions/checkout@v4
+              with:
+                  repository: Gygamyt/site_4_interns
+                  path: ./app
 
-      # 2. Клонируем репозиторий с приложением (публичный)
-      - name: Checkout app
-        uses: actions/checkout@v4
-        with:
-          repository: Gygamyt/site_4_interns
-          path: ./app
+            # 3. Устанавливаем Node.js 20 и pnpm
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm'
 
-      # 3. Устанавливаем Node.js 20 и pnpm
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+            - name: Install pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+            # 4. Устанавливаем docker-compose (на раннере его нет)
+            - name: Install docker-compose
+              run: sudo apt-get update && sudo apt-get install -y docker-compose
 
-      # 4. Устанавливаем docker-compose (на раннере его нет)
-      - name: Install docker-compose
-        run: sudo apt-get update && sudo apt-get install -y docker-compose
+            # 5. Устанавливаем зависимости проекта
+            - name: Install dependencies
+              run: |
+                  cd ./app
+                  pnpm install
 
-      # 5. Устанавливаем зависимости проекта
-      - name: Install dependencies
-        run: |
-          cd ./app
-          pnpm install
+            # 6. Генерируем .env файлы
+            - name: Generate envs
+              run: |
+                  cd ./app
+                  pnpm gen:envs
 
-      # 6. Генерируем .env файлы
-      - name: Generate envs
-        run: |
-          cd ./app
-          pnpm gen:envs
+            # 7. Поднимаем контейнеры (без фронта, он соберётся отдельно)
+            - name: Start backend and DB
+              run: |
+                  cd ./app
+                  docker-compose up -d postgres_db api
 
-      # 7. Поднимаем контейнеры (без фронта, он соберётся отдельно)
-      - name: Start backend and DB
-        run: |
-          cd ./app
-          docker-compose up -d postgres_db api
+            # 8. Ждём БД и сидируем (без -it)
+            - name: Seed database
+              run: |
+                  cd ./app
+                  sleep 5
+                  docker-compose exec -T api pnpm --filter api seed
 
-      # 8. Ждём БД и сидируем (без -it)
-      - name: Seed database
-        run: |
-          cd ./app
-          sleep 5
-          docker-compose exec -T api pnpm --filter api seed
+            # 9. Собираем фронтенд с явной передачей переменных
+            - name: Build frontend
+              run: |
+                  cd ./app/apps/web
+                  VITE_API_URL=http://localhost:3000 \
+                  VITE_API_BASE_URL=http://localhost:3000 \
+                  VITE_API_BASE=http://localhost:3000 \
+                  npx vite build
 
-      # 9. Собираем фронтенд с явной передачей переменных
-      - name: Build frontend
-        run: |
-          cd ./app/apps/web
-          VITE_API_URL=http://localhost:3000 \
-          VITE_API_BASE_URL=http://localhost:3000 \
-          VITE_API_BASE=http://localhost:3000 \
-          npx vite build
+            # 10. Проверяем, что URL API попал в бандл
+            - name: Check bundle for API_URL
+              run: |
+                  cd ./app/apps/web/dist
+                  if grep -r "localhost:3000" .; then
+                    echo "✅ API URL found in bundle"
+                  else
+                    echo "❌ API URL NOT found in bundle"
+                    exit 1
+                  fi
 
-      # 10. Проверяем, что URL API попал в бандл
-      - name: Check bundle for API_URL
-        run: |
-          cd ./app/apps/web/dist
-          if grep -r "localhost:3000" .; then
-            echo "✅ API URL found in bundle"
-          else
-            echo "❌ API URL NOT found in bundle"
-            exit 1
-          fi
+            # 11. Запускаем сервер для раздачи статики
+            - name: Serve frontend
+              run: |
+                  cd ./app
+                  npx serve -s apps/web/dist -l 5173 &
+                  sleep 5
 
-      # 11. Запускаем сервер для раздачи статики
-      - name: Serve frontend
-        run: |
-          cd ./app
-          npx serve -s apps/web/dist -l 5173 &
-          sleep 5
+            # 12. Проверяем, что фронтенд отвечает
+            - name: Check frontend
+              run: curl -s http://localhost:5173 | head -20
 
-      # 12. Проверяем, что фронтенд отвечает
-      - name: Check frontend
-        run: curl -s http://localhost:5173 | head -20
+            # ---- Запуск Playwright тестов с увеличенным таймаутом ----
+            - name: Run Playwright tests
+              run: npx playwright test --timeout=60000
 
-      # 13. Запускаем Playwright тесты (с увеличенным таймаутом)
-      - name: Run Playwright tests
-        run: npx playwright test --timeout=60000
+            # ---- Allure отчёт ----
+            - run: npm install -g allure-commandline
+            - run: allure generate allure-results --clean -o allure-report
+              continue-on-error: true
 
-      # 14. Генерируем Allure-отчёт (если используется)
-      - run: npm install -g allure-commandline
-      - run: allure generate allure-results --clean -o allure-report
-        continue-on-error: true
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: allure-report
+                  path: allure-report
 
-      # 15. Сохраняем отчёты как артефакты
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: allure-report
-          path: allure-report
+    deploy-report:
+        needs: test
+        runs-on: ubuntu-latest
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-  # ----- Деплой отчёта на GitHub Pages -----
-  deploy-report:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+            - name: Download artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: allure-report
+                  path: allure-report
 
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: allure-report
-          path: allure-report
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./allure-report
-          publish_branch: gh-pages
-          keep_files: true
-          force_orphan: true
+            - name: Deploy to GitHub Pages
+              uses: peaceiris/actions-gh-pages@v3
+              with:
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  publish_dir: ./allure-report
+                  publish_branch: gh-pages
+                  keep_files: true
+                  force_orphan: true
