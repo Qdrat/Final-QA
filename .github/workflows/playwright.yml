@@ -40,20 +40,17 @@ jobs:
             - name: Install Playwright Browsers
               run: npx playwright install --with-deps
 
-            # 1. Клонируем приложение (публичный репозиторий)
             - name: Checkout application
               uses: actions/checkout@v4
               with:
                   repository: Qdrat/site_4_interns-feature-intermediate_version
                   path: ./app
 
-            # 2. Устанавливаем pnpm (приложение использует pnpm)
             - name: Setup pnpm
               uses: pnpm/action-setup@v4
               with:
                   version: 9
 
-            # 3. Настраиваем Node.js для приложения (с кешированием pnpm)
             - name: Setup Node for app
               uses: actions/setup-node@v4
               with:
@@ -61,7 +58,6 @@ jobs:
                   cache: 'pnpm'
                   cache-dependency-path: './app/pnpm-lock.yaml'
 
-            # 4. Устанавливаем docker-compose (т.к. на раннере его нет)
             - name: Install docker-compose
               run: |
                   sudo apt-get update
@@ -81,7 +77,6 @@ jobs:
               env:
                   CI: true
 
-            # 6. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
             - name: Wait for services to be ready
               run: |
                   for i in {1..30}; do
