@@ -83,7 +83,15 @@ jobs:
 
             # 6. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
             - name: Wait for services to be ready
-              run: sleep 20
+              run: |
+                  for i in {1..30}; do
+                    if curl -sf http://localhost:3000 > /dev/null; then
+                      echo "Frontend is up"
+                      break
+                    fi
+                    echo "Waiting for frontend... ($i)"
+                    sleep 2
+                  done
 
             - name: Run Playwright tests
               run: npx playwright test
