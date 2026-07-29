@@ -67,13 +67,19 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y docker-compose
 
-            # 5. Запускаем полную установку приложения (сборка, БД, сидирование)
+            - name: Patch app scripts to disable TTY for docker-compose exec
+              run: |
+                  grep -rl "docker-compose exec" ./app --include="*.mjs" --include="*.js" --include="*.cjs" --include="*.sh" | while read -r file; do
+                    echo "Patching: $file"
+                    sed -i -E 's/docker-compose exec (-T )?/docker-compose exec -T /g' "$file"
+                  done
+
             - name: Full setup of application
               run: |
                   cd ./app
                   pnpm full-setup
               env:
-                  CI: true # отключаем интерактивные запросы
+                  CI: true
 
             # 6. Ждём, пока сервисы поднимутся (проверяем health-эндпоинты)
             - name: Wait for services to be ready
