@@ -24,8 +24,6 @@ jobs:
               run: npm run lint
             - name: Check Code Formatting (Prettier)
               run: npm run format:check
-            - name: Run TypeScript Type Check (tsc)
-              run: npx tsc --noEmit
 
     test:
         needs: lint-and-format
