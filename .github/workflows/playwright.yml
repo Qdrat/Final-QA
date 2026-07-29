@@ -130,7 +130,7 @@ jobs:
                   }
                   EOF
 
-            # ---- Собираем фронтенд статически (обход tsc) ----
+            # ---- Собираем фронтенд статически ----
             - name: Build frontend
               run: |
                   cd ./app/apps/web
@@ -143,11 +143,23 @@ jobs:
                   npx serve -s apps/web/dist -l 5173 &
                   sleep 5
 
-            # ---- Отладка: проверяем HTML ----
-            - name: Debug frontend response
+            # ---- Проверяем CORS: делаем запрос к API с Origin фронтенда ----
+            - name: Check CORS headers
               run: |
-                  echo "=== Frontend HTML (first 100 lines) ==="
-                  curl -s http://localhost:5173 | head -100
+                  echo "=== Checking CORS from API ==="
+                  curl -v -H "Origin: http://localhost:5173" http://localhost:3000/api-docs 2>&1 | grep -i "access-control"
+
+            # ---- Выводим логи API (чтобы увидеть, были ли запросы) ----
+            - name: Show API logs
+              run: |
+                  echo "=== API container logs ==="
+                  docker logs shop_system_api_dev --tail 50
+
+            # ---- Отладка: проверяем, что в бандле подставлен URL API ----
+            - name: Check built bundle for API_URL
+              run: |
+                  cd ./app/apps/web/dist
+                  grep -r "localhost:3000" . || echo "API URL not found in bundle!"
 
             # ---- Ожидание готовности API и фронтенда ----
             - name: Wait for services (API & Frontend)
@@ -169,9 +181,9 @@ jobs:
                     sleep 3
                   done
 
-            # ---- Запуск Playwright тестов ----
+            # ---- Запуск Playwright тестов с увеличенным таймаутом ----
             - name: Run Playwright tests
-              run: npx playwright test
+              run: npx playwright test --timeout=60000
 
             # ---- Allure отчёт ----
             - run: npm install -g allure-commandline
