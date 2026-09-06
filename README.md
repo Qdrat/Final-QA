@@ -201,8 +201,8 @@ npm run allure:open
 
 Если у вас возникли вопросы или предложения по улучшению тестов, создавайте **Issue** или **Pull Request**.
 
-
 ---
+
 ---
 
 # 🛒 Playwright Autotests for an Online Store
@@ -239,8 +239,8 @@ The web application (frontend + backend + database) is run locally via **Docker*
 
 ## 🔗 Connection to the Web Application
 
-| Component            | Description                                                                                                                 |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Component              | Description                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Application repository | [`Qdrat/site_4_interns-feature-intermediate_version`](https://github.com/Qdrat/site_4_interns-feature-intermediate_version) |
 
 For running locally, `docker-compose` is used, which spins up all the services with a single command.
@@ -319,14 +319,14 @@ All tests are located in the `tests/` folder. The project uses Page Objects and 
 
 ### Main Commands
 
-| Command               | Description                                            |
-| --------------------- | ------------------------------------------------------- |
-| `npm test`            | Run all tests in headless mode (in parallel)            |
-| `npm run test:headed` | Run all tests with the browser open (headed)             |
-| `npm run test:debug`  | Run tests in debug mode (with inspector)                 |
-| `npm run lint`        | ESLint                                                    |
-| `npm run lint:fix`    | ESLint auto-fix                                           |
-| `npm run forma`       | Prettier write                                            |
+| Command               | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `npm test`            | Run all tests in headless mode (in parallel) |
+| `npm run test:headed` | Run all tests with the browser open (headed) |
+| `npm run test:debug`  | Run tests in debug mode (with inspector)     |
+| `npm run lint`        | ESLint                                       |
+| `npm run lint:fix`    | ESLint auto-fix                              |
+| `npm run forma`       | Prettier write                               |
 
 ---
 
